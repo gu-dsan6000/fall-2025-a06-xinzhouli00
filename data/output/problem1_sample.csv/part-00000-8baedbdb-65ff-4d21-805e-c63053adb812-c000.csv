@@ -1,0 +1,11 @@
+log_entry,log_level
+17/06/08 17:28:09 INFO output.FileOutputCommitter: File Output Committer Algorithm version is 1,INFO
+17/06/09 17:44:01 INFO executor.Executor: Running task 4.0 in stage 792.0 (TID 31723),INFO
+17/06/09 13:13:27 INFO output.FileOutputCommitter: File Output Committer Algorithm version is 1,INFO
+17/06/09 16:28:04 INFO executor.Executor: Running task 14.0 in stage 681.0 (TID 30454),INFO
+"17/06/09 19:23:10 INFO python.PythonRunner: Times: total = 39, boot = 16, init = 23, finish = 0",INFO
+"17/03/29 17:41:36 INFO storage.MemoryStore: Block broadcast_5_piece148 stored as bytes in memory (estimated size 4.0 MB, free 3.6 GB)",INFO
+17/06/09 13:03:36 INFO output.FileOutputCommitter: Saved output of task 'attempt_201706091303_12355_m_000015_494658' to hdfs://10.10.34.11:9000/pjhe/test/40/_temporary/0/task_201706091303_12355_m_000015,INFO
+17/06/10 15:30:19 INFO executor.Executor: Finished task 12.0 in stage 286.0 (TID 5732). 2364 bytes result sent to driver,INFO
+"17/06/09 18:26:32 INFO python.PythonRunner: Times: total = 37, boot = -26, init = 63, finish = 0",INFO
+17/06/08 10:01:47 INFO storage.BlockManager: Found block rdd_2_22 locally,INFO
