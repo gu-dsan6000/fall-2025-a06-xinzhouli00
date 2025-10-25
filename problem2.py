@@ -22,17 +22,30 @@ def clean_out(path: str):
         shutil.rmtree(path)
 
 def run_spark(master_url: str, net_id: str):
-    spark = (SparkSession.builder
-             .appName(f"Problem2_ClusterUsage_{net_id}")
-             .master(master_url if master_url else "local[*]")
-             .getOrCreate())
+    spark = (
+        SparkSession.builder
+        .appName(f"Problem2_ClusterUsage_{net_id}")
+        .master(master_url)
+        .config("spark.jars.packages",
+                "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262")
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider",
+                "com.amazonaws.auth.InstanceProfileCredentialsProvider,com.amazonaws.auth.DefaultAWSCredentialsProviderChain")
+        .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com")
+        .config("spark.hadoop.fs.s3a.path.style.access", "true")
+        # Fix: Use proper numeric values for all timeout settings
+        .config("spark.hadoop.fs.s3a.connection.timeout", "60000")
+        .config("spark.hadoop.fs.s3a.connection.establish.timeout", "60000")
+        .config("spark.hadoop.fs.s3a.connection.maximum", "100")
+        .config("spark.hadoop.fs.s3a.attempts.maximum", "10")
+        .config("spark.hadoop.fs.s3a.retry.limit", "5")
+        .getOrCreate()
+    )
 
-    input_path = "data/raw/"
-    output_path = "data/output/"
-    ensure_dir(output_path)
+    input_path = f"s3a://{net_id}-assignment-spark-cluster-logs/data/raw"
+    output_path = f"s3a://{net_id}-assignment-spark-cluster-logs/data/output"
+    os.makedirs(output_path, exist_ok=True)
 
-    # Read all log files recursively
-    logs = spark.read.text(f"{input_path}/**")
+    logs = spark.read.option("recursiveFileLookup", "true").text(input_path)
 
     # Extract cluster ID and application ID from file path and log line
     logs = (logs
