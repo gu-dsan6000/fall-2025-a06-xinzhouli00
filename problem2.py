@@ -36,93 +36,42 @@ def run_spark(master_url: str, net_id: str):
     print(f"Running Spark job on: {master_url}")
 
     spark = (
-        SparkSession.builder
-        .appName(f"Problem2_ClusterUsage_{net_id}")
-        .master(master_url)
-        .config(
-            "spark.driver.extraClassPath",
-            "/home/ubuntu/spark/jars/hadoop-aws-3.4.1.jar:/home/ubuntu/spark/jars/hadoop-common-3.4.1.jar"
+            SparkSession.builder
+            .appName("Problem1_LogLevelDist")
+
+            # Cluster Configuration
+            .master(master_url)  # Connect to Spark cluster
+
+            # Memory Configuration
+            .config("spark.executor.memory", "4g")
+            .config("spark.driver.memory", "4g")
+            .config("spark.driver.maxResultSize", "2g")
+
+            # Executor Configuration
+            .config("spark.executor.cores", "2")
+            .config("spark.cores.max", "6")  # Use all available cores across cluster
+
+            # S3 Configuration - Use S3A for AWS S3 access
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            .config("spark.hadoop.fs.s3a.aws.credentials.provider", "com.amazonaws.auth.InstanceProfileCredentialsProvider")
+
+            # Performance settings for cluster execution
+            .config("spark.sql.adaptive.enabled", "true")
+            .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+
+            # Serialization
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+
+            # Arrow optimization for Pandas conversion
+            .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+
+            .getOrCreate()
         )
-    .config("spark.jars.packages",
-        ",".join([
-            "org.apache.hadoop:hadoop-aws:3.3.6",
-            "software.amazon.awssdk:bundle:2.25.64",
-            "software.amazon.awssdk:auth:2.25.64",
-            "software.amazon.awssdk:core:2.25.64",
-            "software.amazon.awssdk:sdk-core:2.25.64",
-            "software.amazon.awssdk:sts:2.25.64",
-            "software.amazon.awssdk:s3:2.25.64",
-            "software.amazon.awssdk:aws-core:2.25.64",
-            "software.amazon.awssdk:protocol-core:2.25.64",
-            "software.amazon.awssdk:aws-xml-protocol:2.25.64",
-            "software.amazon.awssdk:aws-query-protocol:2.25.64",
-            "software.amazon.awssdk:url-connection-client:2.25.64",
-            "com.fasterxml.woodstox:woodstox-core:6.4.0",
-            "org.codehaus.woodstox:stax2-api:4.2.1"
-        ])
-    ) \
-    .config("spark.executor.extraClassPath", "/home/ubuntu/.ivy2.5.2/jars/*") \
-    .config("spark.driver.extraClassPath", "/home/ubuntu/.ivy2.5.2/jars/*") \
-    .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-    .config("spark.hadoop.fs.s3a.aws.credentials.provider",
-            "com.amazonaws.auth.DefaultAWSCredentialsProviderChain") \
-    .config("spark.hadoop.fs.s3a.connection.maximum", "100") \
-    .config("spark.hadoop.fs.s3a.connection.timeout", "60000") \
-    .config("spark.hadoop.fs.s3a.connection.establish.timeout", "5000") \
-    .config("spark.hadoop.fs.s3a.attempts.maximum", "20") \
-    .config("spark.hadoop.fs.s3a.retry.limit", "15")
-    .config(
-        "spark.driver.extraClassPath",
-        "/home/ubuntu/spark/jars/woodstox-core-asl-4.4.1.jar"
-    )
-    .config(
-        "spark.executor.extraClassPath",
-        "/home/ubuntu/spark/jars/woodstox-core-asl-4.4.1.jar"
-    )
-
-        # --- ☁️ S3A Configuration ---
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com")
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "com.amazonaws.auth.InstanceProfileCredentialsProvider,"
-            "com.amazonaws.auth.DefaultAWSCredentialsProviderChain"
-        )
-
-        # --- 🩹 Fix Hadoop '60s' parsing issue ---
-        .config("spark.hadoop.fs.s3a.connection.timeout", "60000")
-        .config("spark.hadoop.fs.s3a.connection.establish.timeout", "5000")
-        .config("spark.hadoop.fs.s3a.attempts.maximum", "20")
-        .config("spark.hadoop.fs.s3a.retry.limit", "15")
-        .config("spark.hadoop.fs.s3a.connection.maximum", "100")
-
-        # --- ⚙️ Performance tuning ---
-        .config("spark.hadoop.fs.s3a.paging.maximum", "1000")
-        .config("spark.hadoop.fs.s3a.threads.max", "64")
-        .config("spark.hadoop.fs.s3a.multipart.size", "104857600")
-        .config("spark.hadoop.fs.s3a.multipart.threshold", "209715200")
-        .config("spark.hadoop.fs.s3a.fast.upload", "true")
-
-        # --- 🧠 Serialization & execution ---
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        .config("spark.sql.execution.arrow.pyspark.enabled", "true")
-
-        # --- 🪶 Cluster behavior ---
-        .config("spark.speculation", "true")
-        .config("spark.dynamicAllocation.enabled", "false")
-        .config("spark.default.parallelism", "8")
-
-        # --- 🧭 Logging ---
-        .config("spark.ui.showConsoleProgress", "true")
-
-        .getOrCreate()
-    )
 
     # --- Determine input/output paths ---
     if "spark://" in master_url:
         input_path = f"s3a://{net_id}-assignment-spark-cluster-logs/data/"
-        output_path = f"s3a://{net_id}-assignment-spark-cluster-logs/output/"
+        output_path = "/home/ubuntu/spark-cluster/"
     else:
         input_path = "data/raw/"
         output_path = "data/output/"
@@ -133,10 +82,13 @@ def run_spark(master_url: str, net_id: str):
     # --- Read logs from S3 ---
     logs = spark.read.option("recursiveFileLookup", "true").text(input_path)
 
+    from pyspark.sql.functions import input_file_name
+
     # --- Extract fields ---
     logs = (
-        logs.withColumn("cluster_id", regexp_extract(col("input_file_name()"), r"application_(\d+)_", 1))
-            .withColumn("application_id", regexp_extract(col("input_file_name()"), r"(application_\d+_\d+)", 1))
+        logs.withColumn("file_name", input_file_name())  
+            .withColumn("cluster_id", regexp_extract(col("file_name"), r"application_(\d+)_", 1))
+            .withColumn("application_id", regexp_extract(col("file_name"), r"(application_\d+_\d+)", 1))
             .filter(col("application_id") != "")
     )
 
@@ -248,9 +200,9 @@ def main():
     if args.skip_spark:
         print("Skipping Spark – using existing CSV files for visualization…")
         generate_visualizations(
-            "data/output/problem2_timeline.csv",
-            "data/output/problem2_cluster_summary.csv",
-            output_dir
+            "/home/ubuntu/spark-cluster/problem2_timeline.csv",
+            "/home/ubuntu/spark-cluster/problem2_cluster_summary.csv",
+            "/home/ubuntu/spark-cluster/"
         )
         print("✅ Visualizations regenerated successfully.")
     else:

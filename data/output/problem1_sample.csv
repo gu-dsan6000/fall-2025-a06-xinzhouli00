@@ -1,0 +1,11 @@
+log_entry,log_level
+17/06/09 17:28:56 INFO output.FileOutputCommitter: File Output Committer Algorithm version is 1,INFO
+17/06/09 20:47:39 INFO executor.Executor: Running task 33.0 in stage 1516.0 (TID 60953),INFO
+17/06/09 10:59:31 INFO executor.CoarseGrainedExecutorBackend: Got assigned task 61474,INFO
+17/06/09 20:57:16 INFO executor.CoarseGrainedExecutorBackend: Got assigned task 85413,INFO
+17/06/06 22:04:05 INFO executor.Executor: Finished task 1.0 in stage 248.0 (TID 9926). 2206 bytes result sent to driver,INFO
+17/02/01 15:25:29 INFO executor.Executor: Finished task 421.0 in stage 237.0 (TID 40810). 3378 bytes result sent to driver,INFO
+17/06/09 19:13:49 INFO executor.CoarseGrainedExecutorBackend: Got assigned task 2011,INFO
+17/06/09 17:40:18 INFO mapred.SparkHadoopMapRedUtil: attempt_201706091740_0386_m_000011_15493: Committed,INFO
+17/06/08 15:43:46 INFO executor.Executor: Finished task 24.0 in stage 232.0 (TID 10025). 2364 bytes result sent to driver,INFO
+"17/03/28 11:33:47 INFO storage.MemoryStore: Block broadcast_6_piece273 stored as bytes in memory (estimated size 4.0 MB, free 384.0 MB)",INFO

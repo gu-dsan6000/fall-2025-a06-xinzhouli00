@@ -1,73 +1,142 @@
+#!/usr/bin/env python3
+"""
+Problem 1: NYC TLC Trip Data Analysis (Spark Cluster Version)
+-------------------------------------------------------------
+Usage:
+    uv run python problem1.py spark://<MASTER_PRIVATE_IP>:7077 --net-id <YOUR_NETID>
+
+Example:
+    uv run python problem1.py spark://172.31.88.163:7077 --net-id xl768
+"""
+
+import argparse
+import os
+import pandas as pd
+import time
+import logging
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, regexp_extract, rand, count
-import sys
+from pyspark.sql.functions import col, avg, count, round as spark_round
 
-def main(input_path: str, output_path: str):
-    spark = SparkSession.builder.appName("Problem1_LogLevelDistribution").getOrCreate()
+# ---------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------
 
-    # === 1. Read all text files recursively ===
-    print(f"Reading log files from: {input_path}")
-    logs_df = spark.read.text(f"{input_path}/**")
-    total_lines = logs_df.count()
+# Configure logging with basicConfig
+logging.basicConfig(
+    level=logging.INFO,  # Set the log level to INFO
+    # Define log message format
+    format="%(asctime)s,p%(process)s,{%(filename)s:%(lineno)d},%(levelname)s,%(message)s",
+)
 
-    # === 2. Extract log level using regex ===
-    # Typical Spark log line format: "17/03/29 10:04:41 INFO ApplicationMaster: ..."
-    pattern = r"\b(INFO|WARN|ERROR|DEBUG)\b"
-    logs_with_level = logs_df.withColumn("log_level", regexp_extract(col("value"), pattern, 1))
+logger = logging.getLogger(__name__)
 
-    # Filter only rows that actually contain log levels
-    logs_filtered = logs_with_level.filter(col("log_level") != "")
-    matched_lines = logs_filtered.count()
+def parse_args():
+    p = argparse.ArgumentParser(description="Run NYC TLC trip analysis on Spark cluster")
+    p.add_argument("master", help="Spark master URL (e.g., spark://172.31.xx.xx:7077)")
+    p.add_argument("--net-id", required=True, help="Your Georgetown NetID (used for S3 paths)")
+    return p.parse_args()
 
-    # === 3. Count occurrences of each log level ===
-    level_counts = logs_filtered.groupBy("log_level").agg(count("*").alias("count")).orderBy("log_level")
 
-    # === 4. Take 10 random samples ===
-    samples = logs_filtered.orderBy(rand()).limit(10).select(col("value").alias("log_entry"), "log_level")
+# ---------------------------------------------------------
+# Main Spark Analysis
+# ---------------------------------------------------------
+def run_spark(master_url: str, net_id: str):
+    print(f"Running Spark job on: {master_url}")
 
-    # === 5. Write results ===
-    (level_counts
-        .coalesce(1)
-        .write.mode("overwrite")
-        .option("header", "true")
-        .csv(f"{output_path}/problem1_counts.csv"))
+    spark = (
+            SparkSession.builder
+            .appName("Problem1_LogLevelDist")
 
-    (samples
-        .coalesce(1)
-        .write.mode("overwrite")
-        .option("header", "true")
-        .csv(f"{output_path}/problem1_sample.csv"))
+            # Cluster Configuration
+            .master(master_url)  # Connect to Spark cluster
 
-    # === 6. Summary text ===
-    levels = [r["log_level"] for r in level_counts.collect()]
-    counts = [r["count"] for r in level_counts.collect()]
-    total_with_level = sum(counts)
-    summary_lines = [
-        f"Total log lines processed: {total_lines:,}",
-        f"Total lines with log levels: {matched_lines:,}",
-        f"Unique log levels found: {len(levels)}",
-        "",
-        "Log level distribution:",
-    ]
-    for lvl, cnt in zip(levels, counts):
-        pct = cnt / matched_lines * 100
-        summary_lines.append(f"  {lvl:<6}: {cnt:>10,} ({pct:5.2f}%)")
+            # Memory Configuration
+            .config("spark.executor.memory", "4g")
+            .config("spark.driver.memory", "4g")
+            .config("spark.driver.maxResultSize", "2g")
 
-    summary_text = "\n".join(summary_lines)
+            # Executor Configuration
+            .config("spark.executor.cores", "2")
+            .config("spark.cores.max", "6")  # Use all available cores across cluster
 
-    (spark.sparkContext.parallelize([summary_text], 1)
-        .saveAsTextFile(f"{output_path}/problem1_summary.txt"))
+            # S3 Configuration - Use S3A for AWS S3 access
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            .config("spark.hadoop.fs.s3a.aws.credentials.provider", "com.amazonaws.auth.InstanceProfileCredentialsProvider")
 
-    print("\n=== Summary ===")
-    print(summary_text)
+            # Performance settings for cluster execution
+            .config("spark.sql.adaptive.enabled", "true")
+            .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+
+            # Serialization
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+
+            # Arrow optimization for Pandas conversion
+            .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+
+            .getOrCreate()
+        )
+
+    # -----------------------------------------------------
+    # Paths
+    # -----------------------------------------------------
+    start_time = time.time()
+    input_path = "s3a://xl768-assignment-spark-cluster-logs/data/"
+    output_dir = os.path.expanduser("~/spark-cluster")
+    os.makedirs(output_dir, exist_ok=True)
+    logger.info(f"Reading raw log data from: {input_path}")
+
+    print("\nReading raw log data...")
+    print("=" * 60)
+    print(f"Input path: {input_path}")
+    df = spark.read.text(input_path + "/**/*")
+    df = df.withColumnRenamed("value", "log_entry")
+    df.show(5, truncate=False)
+
+
+    # -----------------------------------------------------
+    # Analysis
+    # -----------------------------------------------------
+    print("Computing trip counts per passenger count...")
+    counts_df = df.groupBy("passenger_count").count().orderBy("passenger_count")
+    counts_out = os.path.join(output_dir, "problem1_counts.csv")
+    counts_df.coalesce(1).write.mode("overwrite").option("header", True).csv(counts_out)
+
+    print("Sampling 100 trips for inspection...")
+    sample_df = df.sample(fraction=0.001).limit(100)
+    sample_out = os.path.join(output_dir, "problem1_sample.csv")
+    sample_df.coalesce(1).write.mode("overwrite").option("header", True).csv(sample_out)
+
+    print("Computing average fare by passenger count...")
+    summary_df = (
+        df.groupBy("passenger_count")
+        .agg(spark_round(avg("fare_amount"), 2).alias("avg_fare"),
+             spark_round(avg("trip_distance"), 2).alias("avg_distance"))
+        .orderBy("passenger_count")
+    )
+
+    # -----------------------------------------------------
+    # Save results
+    # -----------------------------------------------------
+    summary_out = os.path.join(output_dir, "problem1_summary.txt")
+
+    # Convert to Pandas for easy writing
+    pdf = summary_df.toPandas()
+    with open(summary_out, "w") as f:
+        f.write("NYC TLC Trip Summary\n")
+        f.write("=====================\n")
+        f.write(f"Total rows: {df.count()}\n\n")
+        f.write(pdf.to_string(index=False))
+        f.write("\n")
+
+    print("✅ Problem 1 complete!")
+    print(f"Outputs written to: {output_dir}")
 
     spark.stop()
 
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: spark-submit problem1.py <input_path> <output_path>")
-        sys.exit(1)
 
-    input_path = sys.argv[1]
-    output_path = sys.argv[2]
-    main(input_path, output_path)
+# ---------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    args = parse_args()
+    run_spark(args.master, args.net_id)
