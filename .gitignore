@@ -65,3 +65,6 @@ IAM_PROFILE_UPDATE.md
 test-iam-detection.sh
 
 data/sample/
+
+reddit_sample.parquet
+*.parquet
