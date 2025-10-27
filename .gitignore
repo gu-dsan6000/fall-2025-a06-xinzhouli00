@@ -63,3 +63,5 @@ ASSIGNMENT_STRUCTURE_UPDATE.md
 SETUP_SUMMARY.md
 IAM_PROFILE_UPDATE.md
 test-iam-detection.sh
+
+data/sample/
