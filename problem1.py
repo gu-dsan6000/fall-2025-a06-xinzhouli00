@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""
-Problem 1: NYC TLC Trip Data Analysis (Spark Cluster Version)
--------------------------------------------------------------
-Usage:
-    uv run python problem1.py spark://<MASTER_PRIVATE_IP>:7077 --net-id <YOUR_NETID>
-
-Example:
-    uv run python problem1.py spark://172.31.88.163:7077 --net-id xl768
-"""
-
 import argparse
 import os
 import pandas as pd
@@ -31,8 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Run NYC TLC trip analysis on Spark cluster")
-    p.add_argument("master", help="Spark master URL (e.g., spark://172.31.xx.xx:7077)")
+    p = argparse.ArgumentParser(description="Run log analysis on Spark cluster")
     p.add_argument("--net-id", required=True, help="Your Georgetown NetID (used for S3 paths)")
     return p.parse_args()
 
@@ -80,7 +69,7 @@ def run_spark(master_url: str, net_id: str):
     # Paths
     # -----------------------------------------------------
     start_time = time.time()
-    input_path = "s3a://xl768-assignment-spark-cluster-logs/data/"
+    input_path = f"s3a://{net_id}-assignment-spark-cluster-logs/data/"
     output_dir = os.path.expanduser("~/spark-cluster")
     os.makedirs(output_dir, exist_ok=True)
     logger.info(f"Reading raw log data from: {input_path}")
@@ -122,13 +111,13 @@ def run_spark(master_url: str, net_id: str):
     # Convert to Pandas for easy writing
     pdf = summary_df.toPandas()
     with open(summary_out, "w") as f:
-        f.write("NYC TLC Trip Summary\n")
+        f.write("Summary\n")
         f.write("=====================\n")
         f.write(f"Total rows: {df.count()}\n\n")
         f.write(pdf.to_string(index=False))
         f.write("\n")
 
-    print("✅ Problem 1 complete!")
+    print("Problem 1 complete!")
     print(f"Outputs written to: {output_dir}")
 
     spark.stop()

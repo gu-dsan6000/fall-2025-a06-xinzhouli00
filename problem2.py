@@ -12,7 +12,6 @@ from pyspark.sql.functions import regexp_extract, col, min as spark_min, max as 
 # -----------------------
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("master", nargs="?", default=None)
     p.add_argument("--net-id", required=False, default="testnet")
     p.add_argument("--skip-spark", action="store_true")
     return p.parse_args()
@@ -37,7 +36,7 @@ def run_spark(master_url: str, net_id: str):
 
     spark = (
             SparkSession.builder
-            .appName("Problem1_LogLevelDist")
+            .appName("Problem2_LogLevelDist")
 
             # Cluster Configuration
             .master(master_url)  # Connect to Spark cluster
@@ -151,7 +150,7 @@ def run_spark(master_url: str, net_id: str):
         f.write("\n".join(lines))
 
     spark.stop()
-    print("✅ Spark job completed successfully.")
+    print("Spark job completed successfully.")
     return timeline_path, cluster_summary_path, stats_path
 
 
@@ -204,12 +203,12 @@ def main():
             "/home/ubuntu/spark-cluster/problem2_cluster_summary.csv",
             "/home/ubuntu/spark-cluster/"
         )
-        print("✅ Visualizations regenerated successfully.")
+        print("Visualizations regenerated successfully.")
     else:
         print("Running full Spark analysis … this may take 10–20 minutes on the cluster.")
         timeline_csv, cluster_csv, stats_txt = run_spark(args.master, args.net_id)
         generate_visualizations(timeline_csv, cluster_csv, output_dir)
-        print("✅ Problem 2 complete! All outputs written to data/output/")
+        print("Problem 2 complete! All outputs written to data/output/")
 
 if __name__ == "__main__":
     main()
